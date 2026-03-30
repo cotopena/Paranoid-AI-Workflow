@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+PRIVATE_REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+CONFIG_PATH="${PRIVATE_REPO_ROOT}/workflow/tooling.config.json"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  scripts/public-plan-branch [--dry-run] <plan-or-ticket-path> [branch-type] [base-branch]
+
+Examples:
+  scripts/public-plan-branch .documents/.plans/current_plan/PLAN-1003-scenario-reporting-snapshot-backed-2026-03-21.md
+  scripts/public-plan-branch --dry-run .documents/.tickets/current/TICKET-1003-make-scenario-reporting-snapshot-backed-2026-03-21.md fix develop
+EOF
+}
+
+fail() {
+  printf 'FAIL  %s\n' "$*" >&2
+  exit 1
+}
+
+info() {
+  printf '%s\n' "$*"
+}
+
+DRY_RUN=0
+if [[ "${1:-}" == "--dry-run" ]]; then
+  DRY_RUN=1
+  shift
+fi
+
+ARTIFACT_ARG="${1:-}"
+BRANCH_TYPE="${2:-feat}"
+BASE_BRANCH="${3:-main}"
+
+if [[ -z "${ARTIFACT_ARG}" ]]; then
+  usage >&2
+  exit 1
+fi
+
+case "${BRANCH_TYPE}" in
+  feat|fix|chore|docs|test|refactor)
+    ;;
+  *)
+    fail "Unsupported branch type '${BRANCH_TYPE}'. Allowed: feat, fix, chore, docs, test, refactor."
+    ;;
+esac
+
+PUBLIC_REPO_ROOT="$(
+  node - "${CONFIG_PATH}" <<'NODE'
+const fs = require("fs");
+const path = require("path");
+const configPath = process.argv[2];
+const repoRoot = path.dirname(path.dirname(configPath));
+const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+if (!config.publicRepoRoot) {
+  process.exit(1);
+}
+console.log(path.resolve(repoRoot, config.publicRepoRoot));
+NODE
+)"
+
+if [[ "${ARTIFACT_ARG}" = /* ]]; then
+  ARTIFACT_PATH="${ARTIFACT_ARG}"
+else
+  ARTIFACT_PATH="${PRIVATE_REPO_ROOT}/${ARTIFACT_ARG}"
+fi
+
+[[ -f "${ARTIFACT_PATH}" ]] || fail "Artifact does not exist: ${ARTIFACT_ARG}"
+git -C "${PUBLIC_REPO_ROOT}" rev-parse --is-inside-work-tree >/dev/null 2>&1 || fail "Product repo is not a git work tree: ${PUBLIC_REPO_ROOT}"
+
+ARTIFACT_FILE="$(basename -- "${ARTIFACT_PATH}")"
+ARTIFACT_STEM="${ARTIFACT_FILE%.md}"
+SLUG="$(printf '%s' "${ARTIFACT_STEM}" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9._-]+/-/g; s/^-+//; s/-+$//')"
+BRANCH_NAME="gus/${BRANCH_TYPE}/${SLUG}"
+
+CURRENT_BRANCH="$(git -C "${PUBLIC_REPO_ROOT}" branch --show-current)"
+STATUS_OUTPUT="$(git -C "${PUBLIC_REPO_ROOT}" status --porcelain)"
+
+info "Private artifact: ${ARTIFACT_ARG}"
+info "Product repo: ${PUBLIC_REPO_ROOT}"
+info "Target branch: ${BRANCH_NAME}"
+
+if [[ "${CURRENT_BRANCH}" == "${BRANCH_NAME}" ]]; then
+  info "Already on target branch."
+  exit 0
+fi
+
+if [[ -n "${STATUS_OUTPUT}" ]]; then
+  fail "Product repo has uncommitted changes on '${CURRENT_BRANCH:-detached}'. Commit or stash before switching branches."
+fi
+
+git -C "${PUBLIC_REPO_ROOT}" fetch --all --prune >/dev/null 2>&1 || true
+
+if git -C "${PUBLIC_REPO_ROOT}" show-ref --verify --quiet "refs/heads/${BRANCH_NAME}"; then
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
+    info "DRY RUN: would switch to existing local branch '${BRANCH_NAME}'."
+  else
+    git -C "${PUBLIC_REPO_ROOT}" checkout "${BRANCH_NAME}"
+    info "Switched to existing local branch '${BRANCH_NAME}'."
+  fi
+  exit 0
+fi
+
+if git -C "${PUBLIC_REPO_ROOT}" show-ref --verify --quiet "refs/remotes/origin/${BRANCH_NAME}"; then
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
+    info "DRY RUN: would create local tracking branch '${BRANCH_NAME}' from 'origin/${BRANCH_NAME}'."
+  else
+    git -C "${PUBLIC_REPO_ROOT}" checkout -b "${BRANCH_NAME}" --track "origin/${BRANCH_NAME}"
+    info "Created local tracking branch '${BRANCH_NAME}' from 'origin/${BRANCH_NAME}'."
+  fi
+  exit 0
+fi
+
+START_POINT=""
+if git -C "${PUBLIC_REPO_ROOT}" show-ref --verify --quiet "refs/remotes/origin/${BASE_BRANCH}"; then
+  START_POINT="origin/${BASE_BRANCH}"
+elif git -C "${PUBLIC_REPO_ROOT}" show-ref --verify --quiet "refs/heads/${BASE_BRANCH}"; then
+  START_POINT="${BASE_BRANCH}"
+else
+  fail "Base branch '${BASE_BRANCH}' not found in product repo."
+fi
+
+if [[ "${DRY_RUN}" -eq 1 ]]; then
+  info "DRY RUN: would create '${BRANCH_NAME}' from '${START_POINT}'."
+else
+  git -C "${PUBLIC_REPO_ROOT}" checkout -b "${BRANCH_NAME}" "${START_POINT}"
+  info "Created branch '${BRANCH_NAME}' from '${START_POINT}'."
+fi

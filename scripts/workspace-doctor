@@ -1,0 +1,195 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+CONFIG_PATH="${REPO_ROOT}/workflow/tooling.config.json"
+QUIET=0
+FAILURES=0
+WARNINGS=0
+PRODUCT_REPO_REL=""
+PRODUCT_REPO_ROOT=""
+PRODUCT_REPO_READY=0
+
+if [[ "${1:-}" == "--quiet" ]]; then
+  QUIET=1
+fi
+
+say() {
+  if [[ "${QUIET}" -eq 0 ]]; then
+    printf '%s\n' "$*"
+  fi
+}
+
+pass() {
+  say "PASS  $1"
+}
+
+warn() {
+  WARNINGS=$((WARNINGS + 1))
+  say "WARN  $1"
+}
+
+fail() {
+  FAILURES=$((FAILURES + 1))
+  say "FAIL  $1"
+}
+
+if [[ ! -f "${CONFIG_PATH}" ]]; then
+  fail "Missing config: workflow/tooling.config.json"
+  exit 1
+fi
+
+is_placeholder_path() {
+  local value="$1"
+  [[ "${value}" == *"your-product-repo"* || "${value}" == *"CHANGE-ME"* ]]
+}
+
+while IFS=$'\t' read -r product_rel product_abs; do
+  PRODUCT_REPO_REL="${product_rel}"
+  PRODUCT_REPO_ROOT="${product_abs}"
+done < <(
+  node - "${CONFIG_PATH}" <<'NODE'
+const fs = require("fs");
+const path = require("path");
+const configPath = process.argv[2];
+const repoRoot = path.dirname(path.dirname(configPath));
+const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+const rel = config.publicRepoRoot || "";
+console.log([rel, path.resolve(repoRoot, rel)].join("\t"));
+NODE
+)
+
+say "Project workspace doctor"
+say "Workflow repo: ${REPO_ROOT}"
+
+while IFS=$'\t' read -r name kind rel; do
+  path="${REPO_ROOT}/${rel}"
+  placeholder=0
+  if is_placeholder_path "${rel}"; then
+    placeholder=1
+  fi
+
+  if [[ "${kind}" == "dir" ]]; then
+    if [[ -d "${path}" ]]; then
+      pass "${name} -> ${rel}"
+    else
+      if [[ "${placeholder}" -eq 1 ]]; then
+        warn "${name} still uses a template placeholder -> ${rel}"
+      else
+        fail "${name} missing directory -> ${rel}"
+      fi
+    fi
+  else
+    if [[ -f "${path}" ]]; then
+      pass "${name} -> ${rel}"
+    else
+      if [[ "${placeholder}" -eq 1 ]]; then
+        warn "${name} still uses a template placeholder -> ${rel}"
+      else
+        fail "${name} missing file -> ${rel}"
+      fi
+    fi
+  fi
+done < <(
+  node - "${CONFIG_PATH}" <<'NODE'
+const fs = require("fs");
+const configPath = process.argv[2];
+const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+
+const entries = [
+  ["privateWorkspaceRoot", "dir", config.privateWorkspaceRoot],
+  ["publicRepoRoot", "dir", config.publicRepoRoot],
+  ["documents.root", "dir", config.documents.root],
+  ["documents.internalDocsRoot", "dir", config.documents.internalDocsRoot],
+  ["documents.supportingDocsRoot", "dir", config.documents.supportingDocsRoot],
+  ["documents.issues", "dir", config.documents.issues],
+  ["documents.tickets", "dir", config.documents.tickets],
+  ["documents.questions", "dir", config.documents.questions],
+  ["documents.designs", "dir", config.documents.designs],
+  ["documents.structures", "dir", config.documents.structures],
+  ["documents.plans", "dir", config.documents.plans],
+  ["documents.prs", "dir", config.documents.prs],
+  ["documents.research", "dir", config.documents.research],
+  ["documents.thoughts", "dir", config.documents.thoughts],
+  ["documents.changelog", "file", config.documents.changelog],
+  ["documents.businessModel", "file", config.documents.businessModel],
+  ["documents.repoWorkflow", "file", config.documents.repoWorkflow],
+  ["documents.productPrd", "file", config.documents.productPrd],
+  ["documents.implementationPrd", "file", config.documents.implementationPrd],
+  ["documents.progress", "file", config.documents.progress],
+  ["code.repoRoot", "dir", config.code.repoRoot],
+  ["code.app", "dir", config.code.app],
+  ["code.components", "dir", config.code.components],
+  ["code.lib", "dir", config.code.lib],
+  ["code.engine", "dir", config.code.engine],
+  ["code.docs", "dir", config.code.docs],
+  ["code.convex", "dir", config.code.convex],
+  ["code.public", "dir", config.code.public],
+  ["commands.issuesCurrent", "dir", config.commands.issuesCurrent],
+  ["commands.ticketsCurrent", "dir", config.commands.ticketsCurrent],
+  ["commands.questions", "dir", config.commands.questions],
+  ["commands.designs", "dir", config.commands.designs],
+  ["commands.structures", "dir", config.commands.structures],
+  ["commands.plansPending", "dir", config.commands.plansPending],
+  ["commands.plansCurrent", "dir", config.commands.plansCurrent],
+  ["commands.plansCompleted", "dir", config.commands.plansCompleted],
+  ["commands.researchNotes", "dir", config.commands.researchNotes],
+  ["commands.prs", "dir", config.commands.prs],
+];
+
+for (const [name, type, rel] of entries) {
+  if (rel) console.log([name, type, rel].join("\t"));
+}
+
+for (const [index, rel] of (config.code.config || []).entries()) {
+  console.log([`code.config[${index}]`, "file", rel].join("\t"));
+}
+NODE
+)
+
+say "Product repo candidate: ${PRODUCT_REPO_ROOT}"
+
+if is_placeholder_path "${PRODUCT_REPO_REL}"; then
+  warn "product repo path still uses the template placeholder -> ${PRODUCT_REPO_REL}"
+elif git -C "${PRODUCT_REPO_ROOT}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  PRODUCT_REPO_READY=1
+  pass "product repo is a git work tree"
+else
+  fail "product repo is not a git work tree -> ${PRODUCT_REPO_REL}"
+fi
+
+if git -C "${REPO_ROOT}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  pass "workflow repo is a git work tree"
+else
+  fail "workflow repo is not a git work tree"
+fi
+
+if command -v codex >/dev/null 2>&1; then
+  pass "codex command is available"
+else
+  warn "codex command is not on PATH"
+fi
+
+if [[ "${PRODUCT_REPO_READY}" -eq 1 ]]; then
+  if git -C "${PRODUCT_REPO_ROOT}" remote get-url origin >/dev/null 2>&1; then
+    pass "product repo origin remote is configured"
+  else
+    warn "product repo origin remote is not configured"
+  fi
+fi
+
+if git -C "${REPO_ROOT}" remote get-url origin >/dev/null 2>&1; then
+  pass "workflow repo origin remote is configured"
+else
+  warn "workflow repo origin remote is not configured"
+fi
+
+if [[ "${FAILURES}" -gt 0 ]]; then
+  say
+  say "Workspace doctor found ${FAILURES} failure(s) and ${WARNINGS} warning(s)."
+  exit 1
+fi
+
+say
+say "Workspace doctor passed with ${WARNINGS} warning(s)."

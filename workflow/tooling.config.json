@@ -1,0 +1,123 @@
+{
+  "privateWorkspaceRoot": "./",
+  "publicRepoRoot": "../your-product-repo",
+  "documents": {
+    "root": ".documents",
+    "internalDocsRoot": "docs",
+    "supportingDocsRoot": "../your-product-repo/docs",
+    "issues": ".documents/issues",
+    "tickets": ".documents/.tickets",
+    "questions": ".documents/questions",
+    "designs": ".documents/designs",
+    "structures": ".documents/structures",
+    "plans": ".documents/.plans",
+    "prs": ".documents/prs",
+    "research": ".documents/research",
+    "thoughts": ".documents/thoughts",
+    "changelog": ".documents/CHANGELOG.md",
+    "businessModel": ".documents/business-model.md",
+    "repoWorkflow": "docs/repo-workflow.md",
+    "productPrd": "docs/project-context.md",
+    "implementationPrd": "docs/implementation-notes.md",
+    "progress": "docs/progress.md"
+  },
+  "code": {
+    "repoRoot": "../your-product-repo",
+    "app": "../your-product-repo/src/app",
+    "components": "../your-product-repo/src/components",
+    "lib": "../your-product-repo/src/lib",
+    "engine": "../your-product-repo/src/engine",
+    "docs": "../your-product-repo/docs",
+    "convex": "../your-product-repo/convex",
+    "public": "../your-product-repo/public",
+    "config": [
+      "../your-product-repo/next.config.ts",
+      "../your-product-repo/proxy.ts",
+      "../your-product-repo/tsconfig.json",
+      "../your-product-repo/package.json",
+      "../your-product-repo/eslint.config.mjs",
+      "../your-product-repo/postcss.config.mjs",
+      "../your-product-repo/components.json"
+    ]
+  },
+  "commands": {
+    "issuesCurrent": ".documents/issues/current",
+    "issuesDone": ".documents/issues/done",
+    "ticketsNew": ".documents/.tickets/new",
+    "ticketsCurrent": ".documents/.tickets/current",
+    "ticketsDone": ".documents/.tickets/done",
+    "questions": ".documents/questions",
+    "designs": ".documents/designs",
+    "structures": ".documents/structures",
+    "plansPending": ".documents/.plans/pending",
+    "plansCurrent": ".documents/.plans/current_plan",
+    "plansCompleted": ".documents/.plans/completed_plan",
+    "prs": ".documents/prs",
+    "researchNotes": ".documents/research",
+    "thoughts": ".documents/thoughts"
+  },
+  "workflow": {
+    "stageOrder": [
+      "issue",
+      "brief",
+      "questions",
+      "research",
+      "design",
+      "structure",
+      "plan",
+      "implement",
+      "manual_verification",
+      "validate",
+      "commit",
+      "pr"
+    ],
+    "executionContext": {
+      "primaryPlanRoot": ".documents/.plans/current_plan",
+      "reviewPlanRoots": [
+        ".documents/.plans/current_plan",
+        ".documents/.plans/completed_plan"
+      ]
+    },
+    "handoff": {
+      "mode": "in-session-copy-paste",
+      "primaryArtifactOnlyByDefault": true,
+      "savedThoughtHandoffsAllowed": false
+    }
+  },
+  "tools": {
+    "search": {
+      "cli": ["rg", "grep"],
+      "ide": ["builtin:Search", "builtin:CodeSearch"]
+    },
+    "glob": {
+      "cli": ["rg --files", "find"],
+      "ide": ["builtin:ListFiles"]
+    },
+    "list": {
+      "cli": ["ls"],
+      "ide": ["builtin:List"]
+    },
+    "read": {
+      "cli": ["sed -n", "cat"],
+      "ide": ["builtin:Read"]
+    },
+    "web": {
+      "cli": ["builtin:WebFetch"],
+      "ide": ["builtin:WebSearch"]
+    }
+  },
+  "notes": [
+    "Prefer ripgrep (rg) when available for speed.",
+    "Mirror external issues locally before research or planning.",
+    "Create neutral questions under .documents/questions before codebase research when the desired implementation should stay out of research framing.",
+    "Treat .documents/research as the primary evidence store for later design and plan generation.",
+    "Use .documents/designs and .documents/structures as durable approval gates before tactical planning.",
+    "Treat an approved plan under .documents/.plans/current_plan as the default execution and review entrypoint.",
+    "Normal workflow handoffs should stay in session as copy-paste prompts rather than new .documents/thoughts/HANDOFF-... files.",
+    "The workflow repo stores planning artifacts; the product repo lives at the path configured in publicRepoRoot.",
+    "Update publicRepoRoot before the first implementation session if your product repo is not ../your-product-repo.",
+    "Treat docs/project-context.md, docs/implementation-notes.md, and docs/progress.md as the default workflow-side grounding docs.",
+    "Treat ../your-product-repo/docs as the optional support-docs root when the sibling product repo already has durable product or implementation docs.",
+    "When referencing product code from this workflow repo, prefer paths relative to this repo such as ../your-product-repo/src/app/...."
+  ]
+}
