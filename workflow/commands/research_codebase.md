@@ -61,19 +61,42 @@ Do not start from a raw feature request when a questions artifact is available.
   - list files to edit
   - turn unknowns into implementation advice
 
-If the session explicitly authorizes delegation, sub-agents may gather bounded evidence in parallel. Otherwise use the normal repo search/read tools directly.
+When delegation is available in the active runtime, use parallel sub-agents for bounded evidence gathering and keep the main agent focused on synthesis. If delegation is not available, follow the same investigation structure with the normal repo search/read tools directly.
+
+## Delegation Strategy
+
+Use specialized sub-agents to gather evidence in parallel where it materially improves coverage or speed:
+
+- For code location:
+  - `workflow/agents/codebase-locator.md` to find where relevant files, directories, and entry points live
+- For implementation analysis:
+  - `workflow/agents/codebase-analyzer.md` to explain how specific code paths work with file:line references
+- For existing examples and conventions:
+  - `workflow/agents/codebase-pattern-finder.md` to find similar implementations or established patterns already in the repo
+- For external documentation:
+  - `workflow/agents/web-search-researcher.md` only when the user explicitly asks for web research or current external guidance
+
+All sub-agents are documentarians, not critics. They should describe what exists without suggesting improvements, identifying problems, or proposing future changes.
 
 ## Steps
 
 1. Read the questions artifact in full before touching code.
-2. Extract the questions into investigation areas.
-3. Read the linked brief or issue for background only.
-4. Gather evidence from live code and relevant docs.
-5. Organize findings by question.
-6. Call out unanswered questions or ambiguity as unknowns, not recommendations.
-7. Save the research artifact under `.documents/research/`.
-8. Update `.documents/research/.latest`.
-9. Return a concise in-session summary with the saved path and the main findings.
+2. Read any directly mentioned files in full yourself before spawning sub-tasks.
+   - If the user or questions artifact names specific files, docs, tickets, or JSON artifacts, read them fully in the main context first.
+3. Extract the questions into investigation areas.
+4. Do not read the linked brief or issue.
+5. Decompose the research into bounded evidence-gathering tasks.
+   - Decide which parts need file location help, implementation tracing, pattern matching, or historical context.
+6. Spawn parallel sub-agents when the runtime allows it.
+   - Use focused prompts so each sub-agent covers one bounded area.
+   - Prefer multiple small, specific sub-agent tasks over one broad delegated request.
+7. Wait for all delegated evidence-gathering tasks to complete before synthesizing.
+8. Gather any remaining evidence from live code and relevant docs yourself.
+9. Organize findings by question.
+10. Call out unanswered questions or ambiguity as unknowns, not recommendations.
+11. Save the research artifact under `.documents/research/`.
+12. Update `.documents/research/.latest`.
+13. Return a concise in-session summary with the saved path and the main findings.
 
 ## File Naming
 
@@ -141,6 +164,8 @@ High-level factual summary of what exists today.
 Before finishing, verify:
 
 * Research was driven by neutral questions, not a solution-shaped request.
+* Any sub-agent work stayed read-only and evidence-seeking.
+* Directly mentioned files were read in the main context before delegation.
 * Findings are organized by question and cite repository-relative `path:line` references.
 * Unknowns remain unknowns; they are not converted into plans.
 * The saved path and `.documents/research/.latest` update are correct.

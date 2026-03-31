@@ -2,11 +2,19 @@
 
 Paranoid AI Workflow is a 12-step, artifact-driven process for using AI coding agents in high-consequence environments.
 
+This repository is a personal adaptation of Dex's 12-Factor Prompts approach. The overall philosophy comes from that model, but the staged artifacts, handoffs, and review gates here are tailored to a workflow that prioritizes output quality and engineer ownership over speed in highly regulated or operationally sensitive environments.
+
 It is designed for teams that care more about output quality, traceability, and controlled execution than raw speed. The workflow is especially useful in regulated or operationally sensitive domains where a weak assumption, vague plan, or low-quality implementation can create real downstream risk.
 
 The core idea is simple: do not run an entire project inside one long AI session.
 
 This workflow assumes that overloaded context windows reduce output quality over time. Instead of asking one session to remember everything, each stage produces a small artifact that becomes the clean input for the next stage. That keeps context focused, makes failure visible earlier, and gives humans better review points.
+
+## Visual Overview
+
+The diagram below shows the staged flow, the artifact handoffs between stages, and the idea that a stage can hand work back to a more appropriate stage in a fresh session when better research, ticket adjustment, or another upstream correction is needed.
+
+![Paranoid AI Workflow visual representation](docs/workflow_visual_representation.png)
 
 ## What This Workflow Optimizes For
 
