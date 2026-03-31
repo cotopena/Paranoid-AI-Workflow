@@ -154,7 +154,7 @@ topic: "[short topic]"
 
 ## Human Review
 - Questions for the human:
-  - `- None.` or up to 3 targeted questions
+  - `- None.` or up to 10 targeted questions
 - Answers:
   - `- Pending.` or dated answer bullets
 - Resulting decisions:
